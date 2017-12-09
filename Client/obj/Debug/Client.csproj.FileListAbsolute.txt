@@ -1,0 +1,6 @@
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\bin\Debug\Client.exe.config
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\bin\Debug\Client.exe
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\bin\Debug\Client.pdb
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\obj\Debug\Client.csprojResolveAssemblyReference.cache
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\obj\Debug\Client.exe
+C:\VS Projects\Training\WebCommunications\TcpChat\Client\obj\Debug\Client.pdb
