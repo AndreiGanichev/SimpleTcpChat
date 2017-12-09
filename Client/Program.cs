@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,9 +16,10 @@ namespace Client
         {
             Console.WriteLine("Введите ваше имя");
             var clientName = Console.ReadLine();
-            var tcpClient = new TcpClient("127.0.0.1", 8080);
-            var chatClient = new Client(clientName, tcpClient);
+            var serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8080);
+            var chatClient = new Client(clientName, serverEndPoint);
             chatClient.ClientReceivedMessageEvent += OnMessageReceived;
+
             if (chatClient.TryConnect())
             {
                 Console.WriteLine($"Связь с сервером установлена");

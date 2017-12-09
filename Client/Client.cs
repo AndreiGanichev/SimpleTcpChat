@@ -1,48 +1,36 @@
-﻿using Common;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
-using System.Linq;
+using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
+using Common;
 
 namespace Client
 {
     public class Client
     {
+        private Guid _clientId;
         private string _clientName;
-        private TcpClient _tcpClient;
+        private EndPoint _serverEndPoint;
         private bool _isListening;
 
-        public Client(string name, TcpClient client)
+        public Client(string name, EndPoint serverEndPoint)
         {
             _clientName = name;
-            _tcpClient = client;
+            _serverEndPoint = serverEndPoint;
         }
 
         public event EventHandler<ClientMessageEventArgs> ClientReceivedMessageEvent;
 
         public bool TryConnect()
         {
-            var writer = new StreamWriter(_tcpClient.GetStream());
-            var reader = new StreamReader(_tcpClient.GetStream());
-            string serverAnswer = null;
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Connect(_serverEndPoint);
+            socket.WriteMessage($"{WellKnownStrings.ConnectionRequestCode}{_clientName}");
+            var serverAnswerParts = socket.ReadMessage().Split(':');
 
-            try
-            {
-                writer.WriteLine(_clientName);
-                writer.Flush();
-                serverAnswer = reader.ReadLine();
-            }
-            finally
-            {
-                writer.Close();
-                reader.Close();
-            }
-
-            if (!string.IsNullOrWhiteSpace(serverAnswer)
-                && !string.Equals(serverAnswer, WellKnownStrings.AnswerIfConnected, StringComparison.OrdinalIgnoreCase))
+            if (serverAnswerParts == null || serverAnswerParts.Length != 2
+                && !string.Equals(serverAnswerParts[0], WellKnownStrings.AnswerIfConnected, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -54,11 +42,9 @@ namespace Client
 
         public void SendMessage(string message)
         {
-            using (var writer = new StreamWriter(_tcpClient.GetStream()))
-            {
-                writer.WriteLine(message);
-                writer.Flush();
-            }
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Connect(_serverEndPoint);
+            socket.WriteMessage($"{_clientId.ToString()}:{message}");
         }
 
         public void StopListening()
@@ -73,11 +59,10 @@ namespace Client
                 {
                     while (_isListening)
                     {
-                        using (var reader = new StreamReader(_tcpClient.GetStream()))
-                        {
-                            var readMessage = reader.ReadLine();
-                            ClientReceivedMessageEvent.Invoke(this, new ClientMessageEventArgs(Guid.Empty, readMessage));
-                        }
+                        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                        socket.Connect(_serverEndPoint);
+                        var readMessage = socket.ReadMessage();
+                        ClientReceivedMessageEvent.Invoke(this, new ClientMessageEventArgs(Guid.Empty, readMessage));
                     }
                 });
         }
