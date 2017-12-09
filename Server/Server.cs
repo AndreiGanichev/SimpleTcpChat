@@ -30,19 +30,26 @@ namespace Server
             while (true)
             {
                 var childSocket = parentSocket.Accept();//берем из очереди запросов один и создаем для него дочерний сокет
-                var clientName = ReadFromSocket(childSocket);
-                var newClient = new Client(clientName);
-                Clients.Add(newClient);
-                WriteInSocket(childSocket, WellKnownStrings.AnswerIfConnected );
-                Console.WriteLine($"Клиент {clientName} подключен к чату");
+                var message = ReadFromSocket(childSocket);
+                
+                if (message.Contains(WellKnownStrings.ConnectionRequestCode))
+                {
+                    var clientName = message.Replace(WellKnownStrings.ConnectionRequestCode, string.Empty);
+                    var newClient = new Client(clientName, childSocket.RemoteEndPoint);
+                    Clients.Add(newClient);
+                    WriteInSocket(childSocket, $"{WellKnownStrings.AnswerIfConnected}{newClient.Id}");
+                    Console.WriteLine($"Клиент {clientName} подключен к чату");
+                }
+                else
+                {
+                    var parts = message.Split(':');
+                    var authorId = new Guid(parts[0]);
+                    BroadcastMessage(parts[1], authorId);
+                }
+
+                childSocket.Shutdown(SocketShutdown.Both);
                 childSocket.Close();
             }
-        }
-        public void OnClientMessageReceived(object source, ClientMessageEventArgs eventArg)
-        {
-            var sender = (Client)source;
-            var broadcastMessage = $"{sender.Name}: {eventArg.ClientMessage}";
-            ClientMessageBroadcasted.Invoke(this, eventArg);
         }
 
         private string ReadFromSocket(Socket socket)
@@ -65,6 +72,17 @@ namespace Server
         {
             var data = Encoding.Unicode.GetBytes(message);
             socket.Send(data);
+        }
+
+        private void BroadcastMessage(string message, Guid authorId)
+        {
+            Parallel.ForEach(Clients.Where(c => c.Id != authorId),
+                (c) =>
+                {
+                    var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    socket.Connect(c.EndPoint);
+                    WriteInSocket(socket, message);
+                });
         }
     }
 }
