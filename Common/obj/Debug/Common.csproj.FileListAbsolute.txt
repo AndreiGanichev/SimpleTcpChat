@@ -1,0 +1,5 @@
+C:\GitRepositories\SimpleTcpChat\Common\bin\Debug\Common.dll
+C:\GitRepositories\SimpleTcpChat\Common\bin\Debug\Common.pdb
+C:\GitRepositories\SimpleTcpChat\Common\obj\Debug\Common.csprojResolveAssemblyReference.cache
+C:\GitRepositories\SimpleTcpChat\Common\obj\Debug\Common.dll
+C:\GitRepositories\SimpleTcpChat\Common\obj\Debug\Common.pdb
