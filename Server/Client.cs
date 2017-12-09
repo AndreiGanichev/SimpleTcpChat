@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+using Common;
 
 namespace Server
 {
@@ -24,13 +22,15 @@ namespace Server
 
         public void OnClientMessageBroadcasted(object source, ClientMessageEventArgs eventArg)
         {
-            if (eventArg.ClientId != Id)
+            if (eventArg.ClientId == Id)
             {
-                using (var streamWriter = new StreamWriter(Stream))
-                {
-                    streamWriter.WriteLine(eventArg.ClientMessage);
-                    streamWriter.Flush();
-                }
+                return;
+            }
+
+            using (var streamWriter = new StreamWriter(Stream))
+            {
+                streamWriter.WriteLine(eventArg.ClientMessage);
+                streamWriter.Flush();
             }
         }
 

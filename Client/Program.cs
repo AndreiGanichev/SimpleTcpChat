@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,20 +16,28 @@ namespace Client
             Console.WriteLine("Введите ваше имя");
             var clientName = Console.ReadLine();
             var tcpClient = new TcpClient("127.0.0.1", 8080);
-            var writer = new StreamWriter(tcpClient.GetStream());
-            var reader = new BinaryReader(tcpClient.GetStream());
-            writer.WriteLine(clientName);
-            writer.Flush();
-            var buffer = new byte[256];
-            reader.Read(buffer, 0, buffer.Length);
-
-            if (!Encoding.Unicode.GetString(buffer).Equals("CONNECTED", StringComparison.Ordinal))
+            var chatClient = new Client(clientName, tcpClient);
+            chatClient.ClientReceivedMessageEvent += OnMessageReceived;
+            if (chatClient.TryConnect())
             {
-                return;
+                Console.WriteLine($"Связь с сервером установлена");
+            }
+            else
+            {
+                Console.WriteLine($"Нет связи с сервером");
             }
 
-            Console.WriteLine($"Вы подключены к чату под именем {clientName}");
-            Console.ReadKey();
+            while (true)
+            {
+                Console.Write("Вы:");
+                var message = Console.ReadLine();
+                chatClient.SendMessage(message);
+            }
+        }
+
+        private static void OnMessageReceived(object sender, ClientMessageEventArgs e)
+        {
+            Console.WriteLine(e.ClientMessage);
         }
     }
 }
