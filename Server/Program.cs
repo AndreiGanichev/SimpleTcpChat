@@ -12,7 +12,7 @@ namespace Server
         static void Main(string[] args)
         {
             var server = new Server();
-            var serverThread = new Thread(new ThreadStart(server.ConnectClients));
+            var serverThread = new Thread(new ThreadStart(server.StartConnectClients));
             serverThread.Start();
         }
     }

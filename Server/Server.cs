@@ -22,22 +22,20 @@ namespace Server
             Listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
         }
 
-        public void ConnectClients()
+        public void StartConnectClients()
         {
-            while(true)
+            Listener.Start();
+            var parentSocket = Listener.AcceptSocket();//блокирует вызывающий поток, пока клиент не запросит соединение
+
+            while (true)
             {
-                Listener.Start();
-                var stream = Listener.AcceptTcpClient().GetStream();
-                var reader = new StreamReader(stream);
-                var writer = new StreamWriter(stream);
-                var clientName = reader.ReadLine();
-                var newClient = new Client(clientName, stream);
-                newClient.MessageRecieved += OnClientMessageReceived;
-                ClientMessageBroadcasted += newClient.OnClientMessageBroadcasted;
+                var childSocket = parentSocket.Accept();//берем из очереди запросов один и создаем для него дочерний сокет
+                var clientName = ReadFromSocket(childSocket);
+                var newClient = new Client(clientName);
                 Clients.Add(newClient);
-                writer.WriteLine(WellKnownStrings.AnswerIfConnected );
-                writer.Flush();
+                WriteInSocket(childSocket, WellKnownStrings.AnswerIfConnected );
                 Console.WriteLine($"Клиент {clientName} подключен к чату");
+                childSocket.Close();
             }
         }
         public void OnClientMessageReceived(object source, ClientMessageEventArgs eventArg)
@@ -45,6 +43,28 @@ namespace Server
             var sender = (Client)source;
             var broadcastMessage = $"{sender.Name}: {eventArg.ClientMessage}";
             ClientMessageBroadcasted.Invoke(this, eventArg);
+        }
+
+        private string ReadFromSocket(Socket socket)
+        {
+            StringBuilder builder = new StringBuilder();
+            int bytes = 0;
+            byte[] data = new byte[256];
+
+            do
+            {
+                bytes = socket.Receive(data);
+                builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
+            }
+            while (socket.Available > 0);
+
+            return builder.ToString();
+        }
+
+        private void WriteInSocket(Socket socket, string message)
+        {
+            var data = Encoding.Unicode.GetBytes(message);
+            socket.Send(data);
         }
     }
 }
