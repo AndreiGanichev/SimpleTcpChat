@@ -18,7 +18,7 @@ namespace Client
             var clientName = Console.ReadLine();
             var serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8080);
             var chatClient = new Client(clientName, serverEndPoint);
-            chatClient.ClientReceivedMessageEvent += OnMessageReceived;
+            chatClient.ClientGetMessageEvent += OnMessageReceived;
 
             if (chatClient.TryConnect())
             {
@@ -37,7 +37,7 @@ namespace Client
             }
         }
 
-        private static void OnMessageReceived(object sender, ClientMessageEventArgs e)
+        private static void OnMessageReceived(object sender, ClientGetMessageEventArgs e)
         {
             Console.WriteLine(e.ClientMessage);
         }

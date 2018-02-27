@@ -1,23 +1,48 @@
-﻿using System;
-using System.IO;
+﻿using Common;
+using System;
 using System.Net.Sockets;
-using System.Text;
-using Common;
-using System.Net;
+using System.Threading.Tasks;
 
 namespace Server
 {
     public class Client
     {
-        public Guid Id { get; private set; }
-        public string Name { get; set; }
-        public EndPoint EndPoint{ get; set; }
+        private Socket _socket;
 
-        public Client(string name, EndPoint endpoint)
+        public int Id { get; }
+        public string Name { get; }
+        public event EventHandler<ClientGetMessageEventArgs> ClientGetMessage;
+
+        public Client(int id, string name, Socket socket)
         {
-            Id = new Guid();
+            Id = id;
             Name = name;
-            EndPoint = endpoint;
+            _socket = socket;
+        }
+
+        public void StartListening()
+        {
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        var message = _socket.ReadMessage();
+                        ClientGetMessage?.Invoke(this, new ClientGetMessageEventArgs(message));
+                    }
+                    catch (SocketException)
+                    {
+                        SendMessage("Истекло время ожидания");
+                        break;
+                    }
+                }
+            });
+        }
+
+        public void SendMessage(string message)
+        {
+            _socket.WriteMessage(message);
         }
     }
 }

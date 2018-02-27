@@ -9,10 +9,11 @@ namespace Client
 {
     public class Client
     {
-        private Guid _clientId;
+        private int _clientId;
         private string _clientName;
         private EndPoint _serverEndPoint;
         private bool _isListening;
+        private Socket _socket;
 
         public Client(string name, EndPoint serverEndPoint)
         {
@@ -20,31 +21,31 @@ namespace Client
             _serverEndPoint = serverEndPoint;
         }
 
-        public event EventHandler<ClientMessageEventArgs> ClientReceivedMessageEvent;
+        public event EventHandler<ClientGetMessageEventArgs> ClientGetMessageEvent;
 
         public bool TryConnect()
         {
-            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(_serverEndPoint);
-            socket.WriteMessage($"{WellKnownStrings.ConnectionRequestCode}{_clientName}");
-            var serverAnswerParts = socket.ReadMessage().Split(':');
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _socket.Connect(_serverEndPoint);
+            _socket.WriteMessage($"{WellKnownStrings.ConnectionRequestCode}{_clientName}");
+            var serverAnswerParts = _socket.ReadMessage().Split(':');
+            bool result = false;
 
-            if (serverAnswerParts == null || serverAnswerParts.Length != 2
-                && !string.Equals(serverAnswerParts[0], WellKnownStrings.AnswerIfConnected, StringComparison.OrdinalIgnoreCase))
+            if (serverAnswerParts != null || serverAnswerParts.Length == 2
+                && string.Equals(serverAnswerParts[0], WellKnownStrings.AnswerIfConnected, StringComparison.OrdinalIgnoreCase))
             {
-                return false;
-            }
+                _clientId = Int32.Parse(serverAnswerParts[1]);
+                result = true;
+            }          
 
             _isListening = true;
             StartListeningServer();
-            return true;
+            return result;
         }
 
         public void SendMessage(string message)
         {
-            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(_serverEndPoint);
-            socket.WriteMessage($"{_clientId.ToString()}:{message}");
+            _socket.WriteMessage($"{_clientId.ToString()}:{message}");
         }
 
         public void StopListening()
@@ -59,10 +60,8 @@ namespace Client
                 {
                     while (_isListening)
                     {
-                        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                        socket.Connect(_serverEndPoint);
-                        var readMessage = socket.ReadMessage();
-                        ClientReceivedMessageEvent.Invoke(this, new ClientMessageEventArgs(Guid.Empty, readMessage));
+                        var readMessage = _socket.ReadMessage();
+                        ClientGetMessageEvent.Invoke(this, new ClientGetMessageEventArgs(readMessage));
                     }
                 });
         }

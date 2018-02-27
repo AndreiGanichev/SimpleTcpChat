@@ -12,76 +12,68 @@ namespace Server
 {
     public class Server
     {
-        public IList<Client> Clients { get; set; }
-        public TcpListener Listener { get; set; }
-        public event EventHandler<ClientMessageEventArgs> ClientMessageBroadcasted;
+        private int _idsCounter;
+        private object _broadCastLock = new object();
+        private IList<Client> _clients { get; set; }
+        private EndPoint _clientEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 51570);
+        private EndPoint _serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8080);
 
         public Server()
         {
-            Clients = new List<Client>();
-            Listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
+            _clients = new List<Client>();
+            //Listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
         }
 
-        public void StartConnectClients()
+        public void Start()
         {
-            Listener.Start();
-            var parentSocket = Listener.AcceptSocket();//блокирует вызывающий поток, пока клиент не запросит соединение
+            //Listener.Start();
+            //var parentSocket = Listener.AcceptSocket();//блокирует вызывающий поток, пока клиент не запросит соединение
+            var parentSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            parentSocket.Bind(_serverEndPoint);
+            parentSocket.Listen(5);
 
             while (true)
             {
                 var childSocket = parentSocket.Accept();//берем из очереди запросов один и создаем для него дочерний сокет
-                var message = ReadFromSocket(childSocket);
+                var message = childSocket.ReadMessage();
                 
                 if (message.Contains(WellKnownStrings.ConnectionRequestCode))
                 {
-                    var clientName = message.Replace(WellKnownStrings.ConnectionRequestCode, string.Empty);
-                    var newClient = new Client(clientName, childSocket.RemoteEndPoint);
-                    Clients.Add(newClient);
-                    WriteInSocket(childSocket, $"{WellKnownStrings.AnswerIfConnected}{newClient.Id}");
-                    Console.WriteLine($"Клиент {clientName} подключен к чату");
-                }
-                else
-                {
-                    var parts = message.Split(':');
-                    var authorId = new Guid(parts[0]);
-                    BroadcastMessage(parts[1], authorId);
-                }
-
-                childSocket.Shutdown(SocketShutdown.Both);
-                childSocket.Close();
+                    var clientName = message.Split(':')[1];
+                    var newClient = new Client(++_idsCounter, clientName, childSocket);
+                    newClient.ClientGetMessage += ClientGotMessage;
+                    newClient.StartListening();
+                    _clients.Add(newClient);
+                    childSocket.WriteMessage($"{WellKnownStrings.AnswerIfConnected}{newClient.Id.ToString()}");
+                    Console.WriteLine($"Клиент {clientName}, порт {childSocket.RemoteEndPoint.ToString()} подключен к чату");
+                }          
             }
         }
 
-        private string ReadFromSocket(Socket socket)
+        private void ClientGotMessage(object sender, ClientGetMessageEventArgs e)
         {
-            StringBuilder builder = new StringBuilder();
-            int bytes = 0;
-            byte[] data = new byte[256];
-
-            do
+            lock(_broadCastLock)
             {
-                bytes = socket.Receive(data);
-                builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
-            }
-            while (socket.Available > 0);
+                var client = sender as Client;
 
-            return builder.ToString();
+                if (client != null)
+                {
+                    BroadcastMessage(e.ClientMessage, client.Id);
+                }
+            }            
         }
 
-        private void WriteInSocket(Socket socket, string message)
+        /// <summary>
+        /// Рассылает сообщения всем клиентам, кроме автора
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="authorId"></param>
+        private void BroadcastMessage(string message, int authorId)
         {
-            var data = Encoding.Unicode.GetBytes(message);
-            socket.Send(data);
-        }
-
-        private void BroadcastMessage(string message, Guid authorId)
-        {
-            Parallel.ForEach(Clients.Where(c => c.Id != authorId),
+            Parallel.ForEach(_clients.Where(c => c.Id != authorId),
                 (c) =>
                 {
-                    var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    socket.Connect(c.EndPoint);
-                    WriteInSocket(socket, message);
+                    c.SendMessage($"{c.Name}: {message}");
                 });
         }
     }
